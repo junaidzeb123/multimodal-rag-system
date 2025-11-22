@@ -5,18 +5,16 @@ Orchestrates the complete PDF processing workflow:
 1. Parse PDF (extract text, tables, images)
 2. Build semantic chunks with overlap
 3. Save results
+4. Create embeddings and store in a single combined FAISS index
 
-Usage:
-    python pipeline.py <pdf_path>
-    python pipeline.py --all  (processes all PDFs in ../Data)
 """
 
 import os
-import sys
 import json
 from parser import extract_pdf
 from chunker import build_semantic_chunks
-
+from embedder import index_chunks, save_vectorstore
+import sys
 
 # ============================================================================
 # CONFIGURATION
@@ -68,44 +66,54 @@ def process_pdf_to_chunks(pdf_path):
     return chunks, chunk_file
 
 
+def create_embedding_and_store_in_faiss(file_path):
+    """
+    Create embeddings for chunks and store in FAISS vector store
+    """
+
+    print(f"\n[EMBEDDER] Creating embeddings and storing to FAISS for {file_path}...")
+    index_chunks(file_path)
+
+
 # ============================================================================
 # CLI INTERFACE
 # ============================================================================
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage:")
-        print("  python pipeline.py <pdf_path>")
-        print("  python pipeline.py --all")
+    # Process all PDFs in Data directory
+    data_dir = "./Data"
+    pdf_files = [
+        os.path.join(data_dir, f)
+        for f in os.listdir(data_dir)
+        if f.lower().endswith(".pdf")
+    ]
+
+    if not pdf_files:
+        print(f"No PDF files found in {data_dir}")
         sys.exit(1)
 
-    if sys.argv[1] == "--all":
-        # Process all PDFs in Data directory
-        data_dir = "./Data"
-        pdf_files = [
-            os.path.join(data_dir, f)
-            for f in os.listdir(data_dir)
-            if f.lower().endswith(".pdf")
-        ]
+    print(f"\nFound {len(pdf_files)} PDF files to process\n")
 
-        if not pdf_files:
-            print(f"No PDF files found in {data_dir}")
-            sys.exit(1)
-
-        print(f"\nFound {len(pdf_files)} PDF files to process\n")
-
-        for pdf_path in pdf_files:
-            process_pdf_to_chunks(pdf_path)
-
-    else:
-        # Process single PDF
-        pdf_path = sys.argv[1]
-
-        if not os.path.exists(pdf_path):
-            print(f"Error: File not found: {pdf_path}")
-            sys.exit(1)
-
-        if not pdf_path.lower().endswith(".pdf"):
-            print(f"Error: Not a PDF file: {pdf_path}")
-            sys.exit(1)
-
+    for pdf_path in pdf_files:
         process_pdf_to_chunks(pdf_path)
+
+    # Create embeddings for all chunks and save to vector store
+    chunks_files = [
+        os.path.join(OUTPUT_DIR, f)
+        for f in os.listdir(OUTPUT_DIR)
+        if f.lower().endswith("_chunks.json")
+    ]
+
+    print(f"\n{'=' * 70}")
+    print("CREATING COMBINED FAISS INDEX")
+    print(f"{'=' * 70}\n")
+
+    # Index all chunks into a single FAISS vectorstore
+    for chunk_file in chunks_files:
+        create_embedding_and_store_in_faiss(chunk_file)
+
+    # Save the combined FAISS index
+    save_vectorstore(output_dir="vectordb", index_name="combined_faiss")
+
+    print(f"\n{'=' * 70}")
+    print("✓ ALL PROCESSING COMPLETE!")
+    print(f"{'=' * 70}\n")
