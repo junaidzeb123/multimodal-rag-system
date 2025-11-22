@@ -88,7 +88,7 @@ def format_context(results: List[Tuple[Document, float]], include_scores=False) 
 def generate_answer(
     question: str,
     context_docs: List[Tuple[Document, float]],
-    model_name="llama-3.1-70b-versatile",
+    model_name="openai/gpt-oss-120b",
     temperature=0.2,
 ) -> dict:
     """
