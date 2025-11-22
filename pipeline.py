@@ -23,9 +23,9 @@ OUTPUT_DIR = "parsed_output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Chunking parameters
-MAX_CHUNK_CHARS = 800
-MIN_CHUNK_CHARS = 200
-OVERLAP_CHARS = 100
+MAX_CHUNK_CHARS = 77
+MIN_CHUNK_CHARS = 100
+OVERLAP_CHARS = 50
 
 
 # ============================================================================
