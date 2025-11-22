@@ -5,11 +5,12 @@ A complete Retrieval-Augmented Generation (RAG) system for university documents 
 ## 🌟 Features
 
 - **Multimodal Embeddings**: Uses CLIP for unified text and image embeddings (512-dim)
+- **Image Search**: Upload images to find similar visual content in documents
 - **Smart PDF Processing**: Extracts text, tables, and images with OCR
 - **Semantic Chunking**: Intelligent text chunking with overlap for better context
 - **Vector Search**: FAISS-based similarity search
 - **LLM Generation**: Groq-powered answer generation
-- **ChatGPT-like UI**: Beautiful Streamlit interface for easy interaction
+- **ChatGPT-like UI**: Beautiful Streamlit interface with text and image search modes
 
 ## 📁 Project Structure
 
@@ -107,9 +108,19 @@ python rag_pipeline.py --context-only "Your query here"
 ### Web Interface
 
 1. Open the app: `streamlit run streamlit_app.py`
-2. Type your question in the chat input
-3. View AI-generated answers with sources
-4. Adjust settings in the sidebar (number of documents, show context, etc.)
+2. **Text Search Mode** (default):
+   - Type your question in the chat input
+   - View AI-generated answers with sources
+   - Try example queries like "What is the FYP report format?"
+3. **Image Search Mode**:
+   - Switch to "🖼️ Image Search" in the sidebar
+   - Upload an image (PNG, JPG, JPEG, GIF, BMP)
+   - Click "🔍 Search with this image" to find similar visual content
+   - View retrieved documents with similar diagrams, charts, or images
+4. Adjust settings in the sidebar:
+   - Number of documents to retrieve (1-10)
+   - Toggle "Show retrieved context"
+   - Toggle "Show sources"
 
 ### Command Line
 
@@ -136,9 +147,11 @@ OVERLAP_CHARS = 100      # Overlap between chunks
 
 ### Retrieval Settings (in Streamlit sidebar)
 
+- **Search Mode**: Text Search or Image Search
 - **Number of documents**: 1-10 (default: 5)
 - **Show context**: Toggle retrieved document chunks
 - **Show sources**: Toggle source attribution
+- **Image Upload** (Image Search mode): Upload images to find similar content
 
 ### LLM Settings (in `generator.py`)
 
@@ -214,12 +227,31 @@ max_tokens=2048              # Maximum response length
 
 ## 🎯 Key Components
 
-### 1. CLIP Embeddings
+### 1. Multimodal Search
+
+**Text Search:**
+- Type natural language questions
+- CLIP encodes text queries into 512-dim embeddings
+- Searches across all document types (text, tables, images)
+- Example: "What are the FYP evaluation criteria?"
+
+**Image Search:**
+- Upload any image (charts, diagrams, photos)
+- CLIP encodes image into same 512-dim space as text
+- Finds visually similar content in documents
+- Use cases:
+  - Find similar diagrams or flowcharts
+  - Locate related charts or graphs
+  - Search by organizational logos or photos
+  - Identify similar document layouts
+
+### 2. CLIP Embeddings
 - **Why CLIP?** Unified embedding space for text and images
 - **Dimension**: 512 (efficient and effective)
 - **Token Limit**: Handles 77-token limit by chunking and averaging
+- **Multimodal**: Text and images embedded in the same space
 
-### 2. FAISS Vector Store
+### 3. FAISS Vector Store
 - **Index Type**: IndexFlatIP (inner product for cosine similarity)
 - **Advantages**: Fast similarity search, memory efficient
 - **Normalization**: L2-normalized embeddings

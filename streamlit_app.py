@@ -11,8 +11,8 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from retriever import load_vectorstore, search_text
-from generator import generate_answer, generate_answer_with_streaming, format_context
+from retriever import load_vectorstore, search_text, search_image
+from generator import generate_answer
 import dotenv
 
 # Load environment variables
@@ -109,6 +109,13 @@ st.markdown("""
         background: #555;
     }
     
+    /* Image display in chat */
+    .stImage {
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        margin: 12px 0;
+    }
+    
     /* Animations */
     @keyframes slideInRight {
         from {
@@ -146,6 +153,13 @@ st.markdown("""
     
     [data-testid="stSidebar"] .stMarkdown {
         color: white;
+    }
+    
+    /* File uploader styling */
+    [data-testid="stSidebar"] .stFileUploader {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px;
     }
     
     /* Button styling */
@@ -207,10 +221,28 @@ if 'show_context' not in st.session_state:
 if 'num_results' not in st.session_state:
     st.session_state.num_results = 5
 
+if 'search_mode' not in st.session_state:
+    st.session_state.search_mode = "text"  # "text" or "image"
+
+if 'uploaded_image' not in st.session_state:
+    st.session_state.uploaded_image = None
+
 
 # Sidebar
 with st.sidebar:
     st.title("⚙️ Settings")
+    
+    # Search mode selector
+    st.markdown("### 🔍 Search Mode")
+    search_mode = st.radio(
+        "Select search type:",
+        ["📝 Text Search", "🖼️ Image Search"],
+        index=0 if st.session_state.search_mode == "text" else 1,
+        help="Choose between text-based or image-based search"
+    )
+    st.session_state.search_mode = "text" if "Text" in search_mode else "image"
+    
+    st.divider()
     
     # Number of retrieved documents
     num_results = st.slider(
@@ -221,6 +253,29 @@ with st.sidebar:
         help="More documents provide more context but may include irrelevant information"
     )
     st.session_state.num_results = num_results
+    
+    st.divider()
+    
+    # Image upload section (only show in image mode)
+    if st.session_state.search_mode == "image":
+        st.markdown("### 🖼️ Upload Image")
+        uploaded_file = st.file_uploader(
+            "Choose an image to search",
+            type=["png", "jpg", "jpeg", "gif", "bmp"],
+            help="Upload an image to find similar content in documents"
+        )
+        
+        if uploaded_file is not None:
+            # Display uploaded image
+            from PIL import Image
+            image = Image.open(uploaded_file)
+            st.image(image, caption="Uploaded Image", use_column_width=True)
+            st.session_state.uploaded_image = image
+            
+            if st.button("🔍 Search with this image", use_container_width=True):
+                st.session_state.query_to_send = "IMAGE_SEARCH"
+        
+        st.divider()
     
     # Show context toggle
     show_context = st.checkbox(
@@ -267,16 +322,27 @@ with st.sidebar:
     st.divider()
     
     st.markdown("### 💡 Example Queries")
-    example_queries = [
-        "What is the FYP report format?",
-        "Who is Dr. Atif Tahir?",
-        "What are the FYP evaluation criteria?",
-        "Tell me about the ACM chapter",
-    ]
     
-    for query in example_queries:
-        if st.button(f"📝 {query}", key=query, use_container_width=True):
-            st.session_state.query_to_send = query
+    if st.session_state.search_mode == "text":
+        example_queries = [
+            "What is the FYP report format?",
+            "Who is Dr. Atif Tahir?",
+            "What are the FYP evaluation criteria?",
+            "Tell me about the ACM chapter",
+        ]
+        
+        for query in example_queries:
+            if st.button(f"📝 {query}", key=query, use_container_width=True):
+                st.session_state.query_to_send = query
+    else:
+        st.markdown("""
+        <div style='background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 10px 0;'>
+            <p style='margin: 0; color: #4a5568; font-size: 0.9em;'>
+                📸 <strong>Image Search Mode:</strong><br>
+                Upload an image above to find similar content, diagrams, charts, or visual elements in the documents.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # Main chat interface
@@ -307,6 +373,10 @@ for message in st.session_state.messages:
             <div style='line-height: 1.6;'>{content}</div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Show query image if it's an image-based query
+        if "query_image" in message:
+            st.image(message["query_image"], caption="🖼️ Query Image", use_column_width=True, width=300)
     else:
         st.markdown(f"""
         <div class="assistant-message">
@@ -344,9 +414,20 @@ for message in st.session_state.messages:
                     {context_html}
                 </div>
                 """, unsafe_allow_html=True)
+        
+        # Show image if it's an image-based query
+        if "query_image" in message:
+            with st.expander("🖼️ View Query Image", expanded=False):
+                st.image(message["query_image"], caption="Query Image", use_column_width=True)
 
-# Chat input
-query = st.chat_input("Ask a question about university documents...")
+# Chat input - show different input based on mode
+if st.session_state.search_mode == "text":
+    query = st.chat_input("Ask a question about university documents...")
+else:
+    # For image mode, show instructions
+    if st.session_state.uploaded_image is None:
+        st.info("👈 Upload an image in the sidebar to search for similar content")
+    query = None
 
 # Handle example query button clicks
 if 'query_to_send' in st.session_state:
@@ -360,8 +441,10 @@ if query:
     # Display user message immediately
     st.markdown(f"""
     <div class="user-message">
-        <strong>👤 You:</strong><br>
-        {query}
+        <div style='display: flex; align-items: center; margin-bottom: 8px;'>
+            <span class="user-avatar">👤 You</span>
+        </div>
+        <div style='line-height: 1.6;'>{query}</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -369,11 +452,34 @@ if query:
     with st.spinner("🔍 Searching documents..."):
         try:
             # Retrieve documents
-            results = search_text(query, st.session_state.vectorstore, k=st.session_state.num_results)
+            if query == "IMAGE_SEARCH" and st.session_state.uploaded_image:
+                # Image-based search
+                # Save image temporarily
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+                    st.session_state.uploaded_image.save(tmp_file.name)
+                    tmp_path = tmp_file.name
+                
+                results = search_image(tmp_path, st.session_state.vectorstore, k=st.session_state.num_results)
+                
+                # Update user message to show image search
+                st.session_state.messages[-1]["content"] = "🖼️ Searching with uploaded image..."
+                st.session_state.messages[-1]["query_image"] = st.session_state.uploaded_image
+                
+                # Clean up temp file
+                import os
+                os.unlink(tmp_path)
+            else:
+                # Text-based search
+                results = search_text(query, st.session_state.vectorstore, k=st.session_state.num_results)
             
             # Generate answer
             with st.spinner("💭 Generating answer..."):
-                response = generate_answer(query, results)
+                if query == "IMAGE_SEARCH":
+                    # For image search, create a context-based response
+                    response = generate_answer("What is shown in this image and what related information do you have?", results)
+                else:
+                    response = generate_answer(query, results)
             
             # Add assistant message to chat
             st.session_state.messages.append({
@@ -392,6 +498,8 @@ if query:
                 "role": "assistant",
                 "content": f"Sorry, I encountered an error: {str(e)}"
             })
+            import traceback
+            st.error(traceback.format_exc())
 
 # Footer
 st.divider()
