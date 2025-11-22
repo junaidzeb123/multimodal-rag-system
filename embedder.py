@@ -137,7 +137,13 @@ def save_vectorstore(output_dir="vectordb", index_name="combined_faiss"):
 
     save_path = os.path.join(output_dir, index_name)
     vectorstore.save_local(save_path)
+    
+    # Save the projector weights
+    projector_path = os.path.join(output_dir, "projector.pt")
+    torch.save(projector.state_dict(), projector_path)
+    
     print(f"\n[OK] Combined FAISS vectorstore saved to {save_path}")
+    print(f"[OK] Projector weights saved to {projector_path}")
     print(f"[OK] Total documents indexed: {len(vectorstore.index_to_docstore_id)}")
 
     return save_path
