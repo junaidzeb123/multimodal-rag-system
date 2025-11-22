@@ -205,7 +205,7 @@ def print_rag_response(question: str, response: dict):
 # ============================================================================
 if __name__ == "__main__":
     import sys
-    from retriever import load_vectorstore, search_text,print_results
+    from retriever import load_vectorstore, search_text, print_results
 
     if len(sys.argv) < 2:
         print("\nUsage:")
